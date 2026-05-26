@@ -1,15 +1,17 @@
 # DeepSeek Proxy 中转站
 
-本地自用 DeepSeek API 代理，支持**响应缓存**、**前缀优化**、**多 Key 轮询**、**智能路由**、**费用统计面板**。
+本地自用 DeepSeek API 代理，支持**双层缓存**、**前缀优化**、**多 Key 轮询**、**智能路由**、**配置热重载**、**费用统计面板**。
 
 ## 功能特性
 
 | 模块 | 说明 |
 |------|------|
-| 响应缓存 | 基于请求 hash 的 SQLite 精确匹配缓存，24h TTL，LRU 淘汰 |
-| 前缀优化 | 自动重排 messages 以最大化 DeepSeek 磁盘前缀缓存命中 |
+| 双层缓存 | 代理层 SQLite 精确匹配缓存 + DeepSeek 磁盘前缀缓存，实测节省 47% 费用 |
+| 前缀优化 | 自动归一化 system prompt + 去重 tool 结果，最大化 DeepSeek 前缀缓存命中 |
+| Stream 缓存 | 流式请求转非 stream 请求以便缓存，后续相同请求直接返回缓存结果 |
 | 多 Key 轮询 | Round-Robin + 429 指数退避 + 健康检查 |
-| 智能路由 | model 别名映射 + 基于内容的 Flash/Pro 自动路由 |
+| 智能路由 | model 别名映射 + 基于内容的 Flash/Pro 自动路由 + 强制模型 |
+| 配置热重载 | 修改 config.yaml 自动生效，无需重启服务 |
 | 费用统计 | 全量统计 token 消耗、缓存命中率、实际/理论费用、节省金额 |
 | 仪表盘 | Chart.js 可视化面板，访问 `/dashboard` |
 
@@ -109,6 +111,8 @@ deepseek:
   model_aliases:
     "deepseek-chat": "deepseek-v4-flash"
     "deepseek-reasoner": "deepseek-v4-flash"
+    "deepseek-v3": "deepseek-v4-flash"
+    "r1": "deepseek-v4-flash"
 ```
 
 ### 缓存策略
@@ -119,7 +123,7 @@ cache:
   db_path: "./data/cache.db"
   ttl_hours: 24
   max_entries: 10000
-  cache_stream: false    # 流式响应暂不缓存
+  cache_stream: true    # 开启后流式请求也能被缓存
 ```
 
 ### 智能路由
@@ -127,17 +131,15 @@ cache:
 ```yaml
 routing:
   default_model: "deepseek-v4-flash"
-  content_rules:
-    "推理": "deepseek-v4-pro"
-    "代码生成": "deepseek-v4-pro"
-    "简单对话": "deepseek-v4-flash"
+  force_model: "deepseek-v4-flash"    # 全量走 Flash 节省 80%+
+  content_rules: {}                    # 基于内容的路由规则（当前为空）
 ```
 
 ### 多 Key 轮询
 
 ```yaml
 key_pool:
-  strategy: "round_robin"
+  strategy: "round_robin"    # round_robin | random
   backoff_seconds: 60
   health_check_interval: 300
 ```
@@ -150,21 +152,29 @@ pricing:
     input_per_million: 0.14
     cache_hit_input_per_million: 0.0028
     output_per_million: 0.28
+  "deepseek-v4-pro":
+    input_per_million: 0.435
+    cache_hit_input_per_million: 0.003625
+    output_per_million: 0.87
 ```
 
 ## 费用节省原理
 
 DeepSeek 的**磁盘前缀缓存**对 cache-hit tokens 提供 **98%** 折扣（$0.0028 vs $0.14 / 1M tokens）。
 
-本代理在此基础上叠加**代理层响应缓存**：对于完全相同的请求（非 stream），直接返回缓存结果，零 API 调用消耗。
+本代理在此基础上叠加**代理层响应缓存**：
 
-两层缓存叠加，RAG 等重复前缀场景可节省 **70~95%** 费用。
+- **非 stream 请求**：完全相同的请求直接返回缓存结果，零 API 调用消耗
+- **stream 请求**：开启 `cache_stream` 后，流式请求转为非 stream 请求以便缓存，后续相同请求直接返回缓存结果
+
+两层缓存叠加，实测可节省 **47%** 费用（RAG 等重复前缀场景可进一步提升至 70~95%）。
 
 ## API 接口
 
 | 端点 | 说明 |
 |------|------|
 | `POST /v1/chat/completions` | OpenAI 兼容代理端点 |
+| `GET /v1/models` | OpenAI 兼容模型列表 |
 | `GET /dashboard` | 可视化统计面板 |
 | `GET /api/stats/summary` | 统计摘要 JSON |
 | `GET /api/stats/daily?days=30` | 每日统计 JSON |
@@ -176,12 +186,12 @@ DeepSeek 的**磁盘前缀缓存**对 cache-hit tokens 提供 **98%** 折扣（$
 ```
 deepseek-server/
 ├── src/
-│   ├── main.py              FastAPI 入口
-│   ├── config.py            YAML + .env 配置加载
-│   ├── proxy.py             核心代理路由
+│   ├── main.py              FastAPI 入口 + 配置热重载
+│   ├── config.py            YAML + .env 双源配置加载
+│   ├── proxy.py             核心代理路由 (含 stream 缓存转换)
 │   ├── cache/
 │   │   ├── response.py      SQLite 响应缓存
-│   │   └── prefix.py        消息前缀优化
+│   │   └── prefix.py        消息前缀优化 (system 归一化 + tool 去重)
 │   ├── router/
 │   │   ├── key_pool.py      Key 轮询池
 │   │   └── model_router.py  智能路由

@@ -103,7 +103,6 @@ tr:hover td{background:#334155}
 <div class="header">
   <h1>DeepSeek Proxy 仪表盘</h1>
   <div class="header-right">
-    <span id="live-badge" style="display:none;background:#166534;color:#4ade80;padding:2px 8px;border-radius:4px;font-size:.7rem">LIVE</span>
     <span id="last-update">--</span>
     <button class="refresh-btn" onclick="loadData()">刷新</button>
   </div>
@@ -194,7 +193,6 @@ tr:hover td{background:#334155}
 
 <script>
 let currentDays = 30;
-let sse = null;
 
 function fmt(n) {
   if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
@@ -217,29 +215,6 @@ function switchDays(days) {
     if (b.textContent.includes(days + '天')) b.classList.add('active');
   });
   loadData();
-}
-
-function startSSE() {
-  if (sse) sse.close();
-  sse = new EventSource('/api/stats/sse');
-  document.getElementById('live-badge').style.display = 'inline';
-
-  sse.onmessage = function(e) {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.error) return;
-      updateUI(data);
-      document.getElementById('last-update').textContent = '实时 ' + new Date().toLocaleTimeString();
-    } catch (err) {
-      console.error('SSE parse error:', err);
-    }
-  };
-
-  sse.onerror = function() {
-    document.getElementById('live-badge').style.display = 'none';
-    // 连接断开后 3s 重连
-    setTimeout(startSSE, 3000);
-  };
 }
 
 async function loadData() {
@@ -460,9 +435,6 @@ function renderDailyTable(daily) {
     tbody.appendChild(tr);
   });
 }
-
-// ========== 初始化: SSE 实时推送 + 首次加载 ==========
-startSSE();
 loadData();
 </script>
 </body>
