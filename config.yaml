@@ -1,0 +1,58 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+  title: "DeepSeek Proxy"
+  description: "DeepSeek API 中转站，支持缓存、轮询、智能路由"
+
+deepseek:
+  base_url: "https://api.deepseek.com"
+  # 从 .env 或此处配置 API Keys
+  api_keys: []
+  # 模型别名映射 (客户端请求的 model -> 实际发送给 DeepSeek 的 model)
+  model_aliases:
+    "deepseek-chat": "deepseek-v4-flash"
+    "deepseek-reasoner": "deepseek-v4-flash"
+    "deepseek-v3": "deepseek-v4-flash"
+    "r1": "deepseek-v4-flash"
+
+cache:
+  enabled: true
+  # SQLite 缓存数据库路径
+  db_path: "./data/cache.db"
+  # 缓存 TTL (小时)
+  ttl_hours: 24
+  # 最大缓存条目数
+  max_entries: 10000
+  # 缓存 stream 响应 (开启后流式请求也能被后续相同请求复用)
+  cache_stream: true
+
+routing:
+  # 默认模型
+  default_model: "deepseek-v4-flash"
+  # 强制使用 V4-Flash (最便宜, 全量走 Flash 节省 80%+)
+  force_model: "deepseek-v4-flash"
+  # 基于内容的路由规则 (已禁用, 全量走 V4-Flash)
+  content_rules: {}
+
+key_pool:
+  # 轮询策略: round_robin | random
+  strategy: "round_robin"
+  # Key 退避恢复时间 (秒)
+  backoff_seconds: 60
+  # 健康检查间隔 (秒), 0 表示关闭
+  health_check_interval: 300
+
+pricing:
+  # DeepSeek V4 Flash (2026年5月价格)
+  "deepseek-v4-flash":
+    input_per_million: 0.14
+    cache_hit_input_per_million: 0.0028
+    output_per_million: 0.28
+  # DeepSeek V4 Pro (促销价, 截至 2026-05-31)
+  "deepseek-v4-pro":
+    input_per_million: 0.435
+    cache_hit_input_per_million: 0.003625
+    output_per_million: 0.87
+
+stats:
+  db_path: "./data/stats.db"
