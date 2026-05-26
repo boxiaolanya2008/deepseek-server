@@ -14,7 +14,6 @@ from src.config import get_config, reload_config
 from src.proxy import router as proxy_router
 from src.router.key_pool import init_key_pool, reset_key_pool
 from src.router.model_router import reset_model_router
-from src.stats.tracker import get_stats_tracker, init_stats, reset_stats_tracker
 
 CONFIG_PATH = "config.yaml"
 
@@ -65,7 +64,6 @@ async def _reload_all():
 
         reset_key_pool()
         reset_model_router()
-        reset_stats_tracker()
 
         cfg = get_config()
         if cfg.deepseek.api_keys:
@@ -82,10 +80,8 @@ async def lifespan(app: FastAPI):
     global _cleanup_task, _watcher_task
     cfg = get_config()
     Path(cfg.cache.db_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(cfg.stats.db_path).parent.mkdir(parents=True, exist_ok=True)
 
     await init_cache()
-    await init_stats()
     await init_key_pool()
 
     _cleanup_task = asyncio.create_task(_periodic_cleanup())
@@ -98,9 +94,7 @@ async def lifespan(app: FastAPI):
     if _watcher_task:
         _watcher_task.cancel()
     cache = get_response_cache()
-    tracker = get_stats_tracker()
     await cache.close()
-    await tracker.close()
     log.info("DeepSeek Proxy 关闭完成")
 
 

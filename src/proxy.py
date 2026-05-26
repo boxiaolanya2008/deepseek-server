@@ -15,7 +15,6 @@ from src.cache.response import get_response_cache
 from src.config import get_config
 from src.router.key_pool import get_key_pool
 from src.router.model_router import get_model_router
-from src.stats.tracker import get_stats_tracker
 
 log = logging.getLogger("proxy")
 router = APIRouter(prefix="/v1", tags=["proxy"])

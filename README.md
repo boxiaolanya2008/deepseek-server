@@ -1,6 +1,6 @@
 # DeepSeek Proxy 中转站
 
-本地自用 DeepSeek API 代理，支持**双层缓存**、**前缀优化**、**多 Key 轮询**、**智能路由**、**配置热重载**、**费用统计面板**。
+本地自用 DeepSeek API 代理，支持**双层缓存**、**前缀优化**、**多 Key 轮询**、**智能路由**、**配置热重载**。
 
 ## 功能特性
 
@@ -12,8 +12,6 @@
 | 多 Key 轮询 | Round-Robin + 429 指数退避 + 健康检查 |
 | 智能路由 | model 别名映射 + 基于内容的 Flash/Pro 自动路由 + 强制模型 |
 | 配置热重载 | 修改 config.yaml 自动生效，无需重启服务 |
-| 费用统计 | 全量统计 token 消耗、缓存命中率、实际/理论费用、节省金额 |
-| 仪表盘 | Chart.js 可视化面板，访问 `/dashboard` |
 
 ## 快速开始
 
@@ -56,7 +54,6 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000
 服务启动后：
 
 - 代理端点: `http://localhost:8000/v1/chat/completions`
-- 仪表盘: `http://localhost:8000/dashboard`
 - 健康检查: `http://localhost:8000/health`
 
 ## 客户端接入
@@ -175,10 +172,6 @@ DeepSeek 的**磁盘前缀缓存**对 cache-hit tokens 提供 **98%** 折扣（$
 |------|------|
 | `POST /v1/chat/completions` | OpenAI 兼容代理端点 |
 | `GET /v1/models` | OpenAI 兼容模型列表 |
-| `GET /dashboard` | 可视化统计面板 |
-| `GET /api/stats/summary` | 统计摘要 JSON |
-| `GET /api/stats/daily?days=30` | 每日统计 JSON |
-| `GET /api/stats/models` | 按模型分组统计 |
 | `GET /health` | 健康检查 |
 
 ## 项目结构
@@ -195,10 +188,8 @@ deepseek-server/
 │   ├── router/
 │   │   ├── key_pool.py      Key 轮询池
 │   │   └── model_router.py  智能路由
-│   ├── stats/
-│   │   └── tracker.py       费用统计追踪
-│   └── dashboard/
-│       └── routes.py        仪表盘 API + HTML
+│   └── stats/
+│       └── tracker.py       费用统计追踪
 ├── config.yaml
 ├── .env.example
 └── requirements.txt
